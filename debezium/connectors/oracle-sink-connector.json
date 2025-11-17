@@ -1,0 +1,28 @@
+{
+  "name": "oracle-clientes-sink",
+  "config": {
+    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "connection.url": "jdbc:oracle:thin:@oracle:1521:XE",
+    "connection.username": "castor_facturacion",
+    "connection.password": "castor_pass",
+    "insert.mode": "upsert",
+    "delete.enabled": "true",
+    "primary.key.mode": "record_key",
+    "primary.key.fields": "id",
+    "table.name.format": "CLIENTES_CDC",
+    "auto.create": "true",
+    "auto.evolve": "true",
+    "topics": "castor.public.clientes",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "transforms": "renameFields",
+    "transforms.renameFields.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.renameFields.renames": "id:ID,nombre:NOMBRE,nit:NIT,email:EMAIL,telefono:TELEFONO,direccion:DIRECCION,activo:ACTIVO,fecha_creacion:FECHA_CREACION,fecha_actualizacion:FECHA_ACTUALIZACION",
+    "batch.size": "100",
+    "max.retries": "10",
+    "retry.backoff.ms": "3000"
+  }
+}

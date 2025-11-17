@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facturacion-service
+  namespace: facturacion
+  labels:
+    app: facturacion-service
+    tier: application
+    component: microservice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: facturacion-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: facturacion-service
+        tier: application
+        component: microservice
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8082"
+    spec:
+      containers:
+      - name: facturacion-service
+        image: facturacion-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8082
+          name: http
+          protocol: TCP
+        env:
+        # Spring Configuration
+        - name: SPRING_PROFILES_ACTIVE
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: SPRING_PROFILES_ACTIVE
+
+        # Oracle Configuration
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: SPRING_DATASOURCE_URL
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: ORACLE_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: facturacion-secret
+              key: SPRING_DATASOURCE_PASSWORD
+
+        # External Services
+        - name: CLIENTE_SERVICE_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: CLIENTE_SERVICE_BASE_URL
+        - name: TAX_CALCULATOR_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: TAX_CALCULATOR_BASE_URL
+
+        # Tracing
+        - name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
+        - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+
+        # JVM Options
+        - name: JAVA_OPTS
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: JAVA_OPTS
+
+        # Logging
+        - name: LOGGING_LEVEL_ROOT
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: LOGGING_LEVEL_ROOT
+        - name: LOGGING_LEVEL_COM_CASTOR
+          valueFrom:
+            configMapKeyRef:
+              name: facturacion-config
+              key: LOGGING_LEVEL_COM_CASTOR
+
+        resources:
+          requests:
+            memory: "768Mi"
+            cpu: "500m"
+          limits:
+            memory: "1536Mi"
+            cpu: "1500m"
+
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8082
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8082
+          initialDelaySeconds: 90
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        startupProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 20
+
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

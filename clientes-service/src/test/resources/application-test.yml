@@ -1,0 +1,75 @@
+# Configuracion para Tests - Clientes Service
+# Utiliza TestContainers para PostgreSQL
+
+spring:
+  # Configuracion de base de datos (dinamica via TestContainers)
+  datasource:
+    # TestContainers inyectara automaticamente estos valores
+    driver-class-name: org.postgresql.Driver
+    # URL, username y password seran configurados dinamicamente por @Testcontainers
+
+  # Configuracion JPA/Hibernate para tests
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # Crear schema automaticamente en cada ejecucion de test
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        # Mostrar SQL para debugging
+        show_sql: true
+        format_sql: true
+        # Usar batch inserts para mejor performance
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    # Mostrar SQL generado
+    show-sql: true
+
+  # Desactivar inicializacion de datos en tests
+  sql:
+    init:
+      mode: never
+
+# Configuracion de logging para tests
+logging:
+  level:
+    # Nivel DEBUG para paquete de la aplicacion
+    com.castor.clientes: DEBUG
+    # Nivel INFO para SQL y parametros
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    # Nivel INFO para Spring
+    org.springframework: INFO
+    org.springframework.web: DEBUG
+    org.springframework.test: DEBUG
+    # Nivel DEBUG para TestContainers
+    org.testcontainers: INFO
+    # Reducir ruido de otros frameworks
+    com.zaxxer.hikari: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Desactivar actuator para tests
+management:
+  endpoints:
+    enabled-by-default: false
+
+# Desactivar OpenAPI/Swagger en tests
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Desactivar Resilience4j en tests (Circuit Breaker, Retry, etc.)
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: false
+  retry:
+    configs:
+      default:
+        maxAttempts: 1

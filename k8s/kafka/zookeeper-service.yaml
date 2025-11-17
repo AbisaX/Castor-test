@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: facturacion
+  labels:
+    app: zookeeper
+    tier: infrastructure
+spec:
+  type: ClusterIP
+  selector:
+    app: zookeeper
+  ports:
+  - name: client
+    port: 2181
+    targetPort: 2181
+    protocol: TCP
+  sessionAffinity: None

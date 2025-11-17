@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: facturacion-config
+  namespace: facturacion
+  labels:
+    app: facturacion-service
+    component: config
+data:
+  # Oracle Configuration
+  ORACLE_HOST: "oracle-service"
+  ORACLE_PORT: "1521"
+  ORACLE_SID: "XE"
+  ORACLE_USER: "castor_facturacion"
+
+  # Spring Configuration
+  SPRING_PROFILES_ACTIVE: "prod"
+  SPRING_DATASOURCE_URL: "jdbc:oracle:thin:@oracle-service:1521:XE"
+
+  # External Services
+  CLIENTE_SERVICE_BASE_URL: "http://clientes-service:8081"
+  TAX_CALCULATOR_BASE_URL: "http://python-service:5000"
+
+  # Zipkin Tracing
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin-service:9411/api/v2/spans"
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+
+  # Cliente Service Configuration
+  CLIENTE_SERVICE_TIMEOUT: "5s"
+  CLIENTE_SERVICE_CONNECTION_TIMEOUT: "3s"
+  CLIENTE_SERVICE_MAX_RETRIES: "3"
+  CLIENTE_SERVICE_ENABLE_CACHE: "true"
+  CLIENTE_SERVICE_CACHE_DURATION: "5m"
+
+  # Tax Calculator Configuration
+  TAX_CALCULATOR_TIMEOUT: "5s"
+  TAX_CALCULATOR_CONNECTION_TIMEOUT: "3s"
+  TAX_CALCULATOR_MAX_RETRIES: "3"
+  TAX_CALCULATOR_ENABLE_LOGGING: "true"
+  TAX_CALCULATOR_DEFAULT_TAX_RATE: "19.00"
+  TAX_CALCULATOR_DEFAULT_DISCOUNT_RATE: "10.00"
+
+  # JVM Options
+  JAVA_OPTS: >-
+    -XX:+UseContainerSupport
+    -XX:MaxRAMPercentage=75.0
+    -XX:+UseG1GC
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/tmp/heapdump.hprof
+
+  # Logging
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_CASTOR: "DEBUG"

@@ -1,0 +1,33 @@
+{
+  "name": "postgres-clientes-source",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "castor_user",
+    "database.password": "castor_pass",
+    "database.dbname": "facturacion_db",
+    "database.server.name": "castor_postgres",
+    "topic.prefix": "castor",
+    "table.include.list": "public.clientes",
+    "plugin.name": "pgoutput",
+    "publication.name": "dbz_publication",
+    "publication.autocreate.mode": "filtered",
+    "slot.name": "debezium_slot",
+    "heartbeat.interval.ms": "10000",
+    "snapshot.mode": "initial",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "decimal.handling.mode": "double",
+    "time.precision.mode": "adaptive",
+    "include.schema.changes": "false",
+    "provide.transaction.metadata": "false"
+  }
+}

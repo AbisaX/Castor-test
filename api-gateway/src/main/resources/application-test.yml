@@ -1,0 +1,29 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: api-gateway-test
+
+gateway:
+  rate-limiting:
+    enabled: false
+  services:
+    clientes:
+      url: http://localhost:8081
+      health-check-enabled: false
+    facturacion:
+      url: http://localhost:8082
+      health-check-enabled: false
+    tax-calculator:
+      url: http://localhost:8083
+      health-check-enabled: false
+
+management:
+  tracing:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.castor.gateway: DEBUG

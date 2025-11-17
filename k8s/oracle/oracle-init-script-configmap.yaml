@@ -1,0 +1,293 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oracle-init-script
+  namespace: facturacion
+  labels:
+    app: oracle
+    component: init-script
+data:
+  01-init.sql: |
+    -- =====================================================
+    -- Script de inicialización para Oracle
+    -- Base de datos de FACTURAS - Kubernetes
+    -- =====================================================
+
+    -- Conectar como SYSTEM
+    CONNECT system/oracle@XE;
+
+    -- Crear usuario de aplicación si no existe
+    DECLARE
+        v_count NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO v_count FROM dba_users WHERE username = 'CASTOR_FACTURACION';
+        IF v_count = 0 THEN
+            EXECUTE IMMEDIATE 'CREATE USER castor_facturacion IDENTIFIED BY castor_pass';
+            EXECUTE IMMEDIATE 'GRANT CONNECT, RESOURCE TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT UNLIMITED TABLESPACE TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT CREATE TABLE TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT CREATE SEQUENCE TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT CREATE TRIGGER TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT CREATE PROCEDURE TO castor_facturacion';
+            EXECUTE IMMEDIATE 'GRANT CREATE VIEW TO castor_facturacion';
+            DBMS_OUTPUT.PUT_LINE('Usuario castor_facturacion creado exitosamente');
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Usuario castor_facturacion ya existe');
+        END IF;
+    END;
+    /
+
+    -- Conectar con usuario de aplicación
+    CONNECT castor_facturacion/castor_pass@XE;
+
+    -- Habilitar DBMS_OUTPUT
+    SET SERVEROUTPUT ON;
+
+    -- Eliminar tablas si existen (para desarrollo)
+    BEGIN
+        EXECUTE IMMEDIATE 'DROP TABLE items_factura CASCADE CONSTRAINTS';
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+    /
+
+    BEGIN
+        EXECUTE IMMEDIATE 'DROP TABLE facturas CASCADE CONSTRAINTS';
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+    /
+
+    -- Eliminar secuencias si existen
+    BEGIN
+        EXECUTE IMMEDIATE 'DROP SEQUENCE seq_facturas';
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+    /
+
+    BEGIN
+        EXECUTE IMMEDIATE 'DROP SEQUENCE seq_items_factura';
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+    /
+
+    -- Crear secuencias
+    CREATE SEQUENCE seq_facturas
+        START WITH 1
+        INCREMENT BY 1
+        NOCACHE
+        NOCYCLE;
+
+    CREATE SEQUENCE seq_items_factura
+        START WITH 1
+        INCREMENT BY 1
+        NOCACHE
+        NOCYCLE;
+
+    -- Crear tabla de facturas
+    CREATE TABLE facturas (
+        id NUMBER PRIMARY KEY,
+        cliente_id NUMBER NOT NULL,
+        numero_factura VARCHAR2(50) NOT NULL UNIQUE,
+        fecha_emision TIMESTAMP NOT NULL,
+        subtotal NUMBER(15,2) NOT NULL,
+        impuestos NUMBER(15,2) NOT NULL,
+        descuentos NUMBER(15,2) NOT NULL,
+        total NUMBER(15,2) NOT NULL,
+        estado VARCHAR2(20) NOT NULL,
+
+        -- Constraints
+        CONSTRAINT chk_subtotal_positivo CHECK (subtotal >= 0),
+        CONSTRAINT chk_impuestos_positivo CHECK (impuestos >= 0),
+        CONSTRAINT chk_descuentos_positivo CHECK (descuentos >= 0),
+        CONSTRAINT chk_total_positivo CHECK (total >= 0),
+        CONSTRAINT chk_estado_valido CHECK (estado IN ('EMITIDA', 'PAGADA', 'ANULADA', 'VENCIDA'))
+    );
+
+    -- Crear tabla de items de factura
+    CREATE TABLE items_factura (
+        id NUMBER PRIMARY KEY,
+        factura_id NUMBER NOT NULL,
+        descripcion VARCHAR2(500) NOT NULL,
+        cantidad NUMBER NOT NULL,
+        precio_unitario NUMBER(15,2) NOT NULL,
+        porcentaje_impuesto NUMBER(5,2) DEFAULT 0,
+        porcentaje_descuento NUMBER(5,2) DEFAULT 0,
+
+        -- Foreign Key
+        CONSTRAINT fk_items_factura FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE CASCADE,
+
+        -- Constraints
+        CONSTRAINT chk_cantidad_positiva CHECK (cantidad > 0),
+        CONSTRAINT chk_precio_positivo CHECK (precio_unitario > 0),
+        CONSTRAINT chk_porcentaje_impuesto CHECK (porcentaje_impuesto >= 0 AND porcentaje_impuesto <= 100),
+        CONSTRAINT chk_porcentaje_descuento CHECK (porcentaje_descuento >= 0 AND porcentaje_descuento <= 100)
+    );
+
+    -- Crear índices
+    CREATE INDEX idx_facturas_cliente ON facturas(cliente_id);
+    CREATE INDEX idx_facturas_numero ON facturas(numero_factura);
+    CREATE INDEX idx_facturas_fecha ON facturas(fecha_emision DESC);
+    CREATE INDEX idx_facturas_estado ON facturas(estado);
+    CREATE INDEX idx_items_factura ON items_factura(factura_id);
+
+    -- Crear triggers para autoincrementar IDs
+    CREATE OR REPLACE TRIGGER trg_facturas_id
+    BEFORE INSERT ON facturas
+    FOR EACH ROW
+    BEGIN
+        IF :NEW.id IS NULL THEN
+            SELECT seq_facturas.NEXTVAL INTO :NEW.id FROM DUAL;
+        END IF;
+    END;
+    /
+
+    CREATE OR REPLACE TRIGGER trg_items_factura_id
+    BEFORE INSERT ON items_factura
+    FOR EACH ROW
+    BEGIN
+        IF :NEW.id IS NULL THEN
+            SELECT seq_items_factura.NEXTVAL INTO :NEW.id FROM DUAL;
+        END IF;
+    END;
+    /
+
+    -- =====================================================
+    -- PROCEDIMIENTO ALMACENADO PL/SQL
+    -- Valida si un cliente existe y está activo
+    -- =====================================================
+
+    CREATE OR REPLACE PROCEDURE validar_cliente_activo (
+        p_cliente_id IN NUMBER,
+        p_es_activo OUT NUMBER
+    ) AS
+    BEGIN
+        DBMS_OUTPUT.PUT_LINE('Validando cliente ID: ' || p_cliente_id);
+
+        p_es_activo := 0;
+
+        IF p_cliente_id IS NULL OR p_cliente_id <= 0 THEN
+            DBMS_OUTPUT.PUT_LINE('Error: ID de cliente inválido');
+            RETURN;
+        END IF;
+
+        -- Simulación: consideramos válidos los clientes con ID entre 1 y 1000
+        -- En producción, esto se validaría contra PostgreSQL usando servicio o DB_LINK
+        IF p_cliente_id > 0 AND p_cliente_id <= 1000 THEN
+            p_es_activo := 1;
+            DBMS_OUTPUT.PUT_LINE('Cliente validado: ID ' || p_cliente_id || ' está activo');
+        ELSE
+            DBMS_OUTPUT.PUT_LINE('Cliente no válido: ID ' || p_cliente_id);
+        END IF;
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Error en validación: ' || SQLERRM);
+            p_es_activo := 0;
+    END validar_cliente_activo;
+    /
+
+    -- Crear función para calcular total de factura
+    CREATE OR REPLACE FUNCTION calcular_total_factura (
+        p_factura_id IN NUMBER
+    ) RETURN NUMBER AS
+        v_total NUMBER(15,2);
+    BEGIN
+        SELECT NVL(SUM(cantidad * precio_unitario), 0)
+        INTO v_total
+        FROM items_factura
+        WHERE factura_id = p_factura_id;
+
+        RETURN v_total;
+    END;
+    /
+
+    -- Insertar datos de prueba
+    INSERT INTO facturas (cliente_id, numero_factura, fecha_emision, subtotal, impuestos, descuentos, total, estado)
+    VALUES (1, 'FACT-K8S-001', SYSTIMESTAMP, 1000000, 190000, 50000, 1140000, 'EMITIDA');
+
+    INSERT INTO items_factura (factura_id, descripcion, cantidad, precio_unitario, porcentaje_impuesto, porcentaje_descuento)
+    VALUES (seq_facturas.CURRVAL, 'Computador Portátil HP', 2, 500000, 19, 5);
+
+    INSERT INTO facturas (cliente_id, numero_factura, fecha_emision, subtotal, impuestos, descuentos, total, estado)
+    VALUES (2, 'FACT-K8S-002', SYSTIMESTAMP, 500000, 95000, 25000, 570000, 'EMITIDA');
+
+    INSERT INTO items_factura (factura_id, descripcion, cantidad, precio_unitario, porcentaje_impuesto, porcentaje_descuento)
+    VALUES (seq_facturas.CURRVAL, 'Monitor Dell 24 pulgadas', 1, 500000, 19, 5);
+
+    COMMIT;
+
+    -- Crear vista para reporte de facturas
+    CREATE OR REPLACE VIEW vista_facturas_detalle AS
+    SELECT
+        f.id as factura_id,
+        f.numero_factura,
+        f.cliente_id,
+        f.fecha_emision,
+        f.estado,
+        i.id as item_id,
+        i.descripcion,
+        i.cantidad,
+        i.precio_unitario,
+        (i.cantidad * i.precio_unitario) as subtotal_item
+    FROM facturas f
+    LEFT JOIN items_factura i ON f.id = i.factura_id
+    ORDER BY f.fecha_emision DESC, i.id;
+
+    -- Comentarios para documentación
+    COMMENT ON TABLE facturas IS 'Tabla que almacena las facturas emitidas a los clientes';
+    COMMENT ON TABLE items_factura IS 'Detalle de los items/productos de cada factura';
+    COMMENT ON COLUMN facturas.numero_factura IS 'Número único de la factura (formato: FACT-XXXXXXX)';
+    COMMENT ON COLUMN facturas.estado IS 'Estado de la factura: EMITIDA, PAGADA, ANULADA, VENCIDA';
+
+    -- Crear tabla para CDC (Change Data Capture desde PostgreSQL)
+    -- Esta tabla será poblada por Debezium Sink Connector
+    BEGIN
+        EXECUTE IMMEDIATE 'DROP TABLE CLIENTES_CDC CASCADE CONSTRAINTS';
+    EXCEPTION
+        WHEN OTHERS THEN NULL;
+    END;
+    /
+
+    CREATE TABLE CLIENTES_CDC (
+        ID NUMBER PRIMARY KEY,
+        NOMBRE VARCHAR2(200),
+        NIT VARCHAR2(50),
+        EMAIL VARCHAR2(100),
+        TELEFONO VARCHAR2(20),
+        DIRECCION VARCHAR2(255),
+        ACTIVO NUMBER(1),  -- 1=true, 0=false
+        FECHA_CREACION TIMESTAMP,
+        FECHA_ACTUALIZACION TIMESTAMP
+    );
+
+    CREATE INDEX idx_clientes_cdc_nit ON CLIENTES_CDC(NIT);
+    CREATE INDEX idx_clientes_cdc_activo ON CLIENTES_CDC(ACTIVO);
+
+    COMMENT ON TABLE CLIENTES_CDC IS 'Tabla replicada desde PostgreSQL mediante CDC (Debezium)';
+
+    -- Mostrar resumen
+    SELECT 'Oracle - Base de datos de FACTURAS inicializada correctamente (Kubernetes)' as mensaje FROM DUAL;
+
+    SELECT
+        COUNT(*) as total_facturas,
+        SUM(CASE WHEN estado = 'EMITIDA' THEN 1 ELSE 0 END) as facturas_emitidas,
+        SUM(total) as monto_total
+    FROM facturas;
+
+    -- Probar procedimiento almacenado
+    DECLARE
+        v_resultado NUMBER;
+    BEGIN
+        validar_cliente_activo(1, v_resultado);
+        DBMS_OUTPUT.PUT_LINE('Resultado validación cliente 1: ' || v_resultado);
+
+        validar_cliente_activo(9999, v_resultado);
+        DBMS_OUTPUT.PUT_LINE('Resultado validación cliente 9999: ' || v_resultado);
+    END;
+    /
+
+    EXIT;

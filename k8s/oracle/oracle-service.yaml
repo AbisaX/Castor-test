@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-service
+  namespace: facturacion
+  labels:
+    app: oracle
+spec:
+  type: ClusterIP
+  ports:
+  - port: 1521
+    targetPort: 1521
+    protocol: TCP
+    name: oracle
+  selector:
+    app: oracle

@@ -1,0 +1,202 @@
+spring:
+  application:
+    name: facturacion-service
+
+  # Configuración de Base de Datos Oracle - PRODUCCIÓN
+  datasource:
+    url: ${DB_URL:jdbc:oracle:thin:@oracle-prod.castor.com:1521:CASTORPRD}
+    username: ${DB_USERNAME:castor_facturacion}
+    password: ${DB_PASSWORD}
+    driver-class-name: oracle.jdbc.OracleDriver
+
+    # HikariCP - Pool de conexiones optimizado para producción
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:10}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: FacturacionHikariPool
+      leak-detection-threshold: 60000
+
+  # JPA / Hibernate - Producción
+  jpa:
+    database-platform: org.hibernate.dialect.Oracle12cDialect
+    hibernate:
+      ddl-auto: validate  # NUNCA usar create o update en producción
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    show-sql: false  # Desactivar en producción
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+        jdbc:
+          batch_size: 50
+          fetch_size: 100
+        order_inserts: true
+        order_updates: true
+        enable_lazy_load_no_trans: false
+        query:
+          plan_cache_max_size: 2048
+
+  # Cache - Producción
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5000,expireAfterWrite=10m
+
+  # Jackson JSON
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: false  # Desactivar indentación en producción
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+# Configuración del servidor - Producción
+server:
+  port: ${SERVER_PORT:8082}
+  servlet:
+    context-path: /
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 1024
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: never
+    include-exception: false
+  shutdown: graceful
+
+# Actuator - Monitoring en Producción
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      application: ${spring.application.name}
+      environment: production
+  tracing:
+    sampling:
+      probability: 0.1  # Samplear solo 10% en producción
+
+# Trazabilidad - Zipkin en Producción
+management.zipkin:
+  tracing:
+    endpoint: ${ZIPKIN_URL:http://zipkin-prod.castor.com:9411/api/v2/spans}
+
+# Configuración de servicios externos - Producción
+services:
+  cliente:
+    base-url: ${CLIENTE_SERVICE_URL:http://clientes-service:8081}
+    timeout: ${CLIENTE_SERVICE_TIMEOUT:5000}
+
+  tax-calculator:
+    base-url: ${TAX_CALCULATOR_URL:http://tax-calculator-service:8083}
+    timeout: ${TAX_CALCULATOR_TIMEOUT:3000}
+    default-tax-rate: 19.00
+    default-discount-rate: 10.00
+
+# Resilience4j - Circuit Breaker y Retry en Producción
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 40
+        wait-duration-in-open-state: 60s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+
+    instances:
+      clienteService:
+        base-config: default
+        failure-rate-threshold: 40
+        wait-duration-in-open-state: 60s
+
+      taxCalculator:
+        base-config: default
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1000ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+
+    instances:
+      clienteService:
+        base-config: default
+        max-attempts: 3
+
+      taxCalculator:
+        base-config: default
+        max-attempts: 2
+
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 10s
+
+    instances:
+      clienteService:
+        timeout-duration: 5s
+
+      taxCalculator:
+        timeout-duration: 3s
+
+# Logging - Producción
+logging:
+  level:
+    root: WARN
+    com.castor.facturacion: INFO
+    org.springframework.web: WARN
+    org.springframework.data: WARN
+    org.hibernate.SQL: WARN
+    io.github.resilience4j: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /var/log/facturacion-service/application.log
+    max-size: 10MB
+    max-history: 30
+
+# Springdoc OpenAPI - Producción
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${SWAGGER_ENABLED:false}  # Desactivar Swagger en producción por seguridad
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+  show-actuator: false

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debezium-connect
+  namespace: facturacion
+  labels:
+    app: debezium-connect
+    tier: infrastructure
+    component: cdc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: debezium-connect
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: debezium-connect
+        tier: infrastructure
+        component: cdc
+    spec:
+      containers:
+      - name: debezium-connect
+        image: debezium/connect:2.4
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8083
+          name: http
+          protocol: TCP
+        env:
+        - name: BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: GROUP_ID
+          value: "1"
+        - name: CONFIG_STORAGE_TOPIC
+          value: "debezium_configs"
+        - name: OFFSET_STORAGE_TOPIC
+          value: "debezium_offsets"
+        - name: STATUS_STORAGE_TOPIC
+          value: "debezium_statuses"
+        - name: CONFIG_STORAGE_REPLICATION_FACTOR
+          value: "1"
+        - name: OFFSET_STORAGE_REPLICATION_FACTOR
+          value: "1"
+        - name: STATUS_STORAGE_REPLICATION_FACTOR
+          value: "1"
+        - name: CONNECT_KEY_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_VALUE_CONVERTER
+          value: "org.apache.kafka.connect.json.JsonConverter"
+        - name: CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
+          value: "false"
+        - name: CONNECT_REST_ADVERTISED_HOST_NAME
+          value: "debezium-connect"
+        - name: LOG_LEVEL
+          value: "INFO"
+
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8083
+          initialDelaySeconds: 90
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 5
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+      restartPolicy: Always

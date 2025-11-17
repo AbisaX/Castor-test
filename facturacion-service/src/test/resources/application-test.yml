@@ -1,0 +1,140 @@
+# Configuración para Tests
+# Este archivo se usa automáticamente cuando se ejecutan los tests
+
+spring:
+  application:
+    name: facturacion-service-test
+
+  # Configuración de Base de Datos Oracle (TestContainers)
+  # Estos valores son sobrescritos dinámicamente por @DynamicPropertySource en los tests
+  datasource:
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 30000
+
+  # JPA/Hibernate
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: create-drop  # Recrear esquema en cada ejecución de tests
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+
+  # Jackson - Configuración JSON
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    deserialization:
+      fail-on-unknown-properties: false
+
+  # Cache (deshabilitado para tests)
+  cache:
+    type: none
+
+# Configuración de servicios externos (mocks)
+services:
+  cliente:
+    base-url: http://localhost:8081  # URL por defecto, puede ser sobrescrita por WireMock
+    timeout: 5000
+    retry:
+      max-attempts: 3
+      wait-duration: 1000
+
+  tax-calculator:
+    base-url: http://localhost:8082  # URL por defecto, puede ser sobrescrita por WireMock
+    timeout: 5000
+    default-tax-rate: 19.00
+    default-discount-rate: 10.00
+    retry:
+      max-attempts: 3
+      wait-duration: 1000
+
+# Resilience4j - Circuit Breaker (configuración más permisiva para tests)
+resilience4j:
+  circuitbreaker:
+    instances:
+      clienteService:
+        register-health-indicator: true
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+        record-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+
+      taxCalculator:
+        register-health-indicator: true
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+        record-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException
+          - java.util.concurrent.TimeoutException
+          - java.io.IOException
+
+      facturacion-service:
+        register-health-indicator: true
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+
+  retry:
+    instances:
+      clienteService:
+        max-attempts: 2  # Reducido para tests más rápidos
+        wait-duration: 100ms
+        retry-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException.InternalServerError
+          - java.util.concurrent.TimeoutException
+
+      taxCalculator:
+        max-attempts: 2  # Reducido para tests más rápidos
+        wait-duration: 100ms
+        retry-exceptions:
+          - org.springframework.web.reactive.function.client.WebClientResponseException.InternalServerError
+          - java.util.concurrent.TimeoutException
+
+      facturacion-service:
+        max-attempts: 2  # Reducido para tests más rápidos
+        wait-duration: 100ms
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.castor.facturacion: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.testcontainers: INFO
+    com.github.dockerjava: WARN
+
+# Actuator - Deshabilitado para tests
+management:
+  endpoints:
+    enabled-by-default: false
+
+# TestContainers
+testcontainers:
+  reuse:
+    enable: false  # No reusar containers entre ejecuciones de tests

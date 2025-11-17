@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: facturacion
+  labels:
+    app: api-gateway
+    component: config
+data:
+  # Spring Configuration
+  SPRING_PROFILES_ACTIVE: "prod"
+
+  # Downstream Services
+  CLIENTES_SERVICE_URL: "http://clientes-service:8081"
+  FACTURACION_SERVICE_URL: "http://facturacion-service:8082"
+  TAX_CALCULATOR_SERVICE_URL: "http://python-service:5000"
+
+  # Zipkin Tracing
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin-service:9411/api/v2/spans"
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+
+  # Gateway Configuration
+  GATEWAY_RATE_LIMIT_CAPACITY: "100"
+  GATEWAY_RATE_LIMIT_REFILL_RATE: "10"
+  GATEWAY_TIMEOUT_MS: "30000"
+
+  # CORS Configuration
+  GATEWAY_CORS_ALLOWED_ORIGINS: "*"
+  GATEWAY_CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+  GATEWAY_CORS_ALLOWED_HEADERS: "*"
+  GATEWAY_CORS_MAX_AGE: "3600"
+
+  # Circuit Breaker Configuration
+  RESILIENCE4J_CIRCUITBREAKER_CONFIGS_DEFAULT_FAILURE_RATE_THRESHOLD: "50"
+  RESILIENCE4J_CIRCUITBREAKER_CONFIGS_DEFAULT_SLOW_CALL_RATE_THRESHOLD: "50"
+  RESILIENCE4J_CIRCUITBREAKER_CONFIGS_DEFAULT_SLOW_CALL_DURATION_THRESHOLD: "3s"
+  RESILIENCE4J_CIRCUITBREAKER_CONFIGS_DEFAULT_SLIDING_WINDOW_SIZE: "10"
+
+  # JVM Options
+  JAVA_OPTS: >-
+    -XX:+UseContainerSupport
+    -XX:MaxRAMPercentage=75.0
+    -XX:+UseG1GC
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/tmp/heapdump.hprof
+
+  # Logging
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_CASTOR: "DEBUG"
+  LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_GATEWAY: "DEBUG"

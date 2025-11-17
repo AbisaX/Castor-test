@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: facturacion-service
+  namespace: facturacion
+  labels:
+    app: facturacion-service
+    tier: application
+spec:
+  type: ClusterIP
+  selector:
+    app: facturacion-service
+  ports:
+  - name: http
+    port: 8082
+    targetPort: 8082
+    protocol: TCP
+  sessionAffinity: None

@@ -1,0 +1,164 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 3000
+        response-timeout: 10s
+        pool:
+          type: elastic
+          max-idle-time: 15s
+      discovery:
+        locator:
+          enabled: false
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+              - PATCH
+            allowedHeaders: "*"
+            exposedHeaders:
+              - X-RateLimit-Remaining
+              - X-RateLimit-Reset
+              - X-Gateway-Response
+              - X-Trace-Id
+              - X-Span-Id
+            maxAge: 3600
+
+# Gateway custom properties
+gateway:
+  rate-limiting:
+    enabled: true
+    default-limit: 100
+    default-refresh-period: 60
+    routes:
+      facturacion:
+        limit: 50
+        refresh-period: 60
+  timeouts:
+    connect: 3000
+    response: 10000
+  circuit-breaker:
+    enabled: true
+    failure-rate-threshold: 50
+    wait-duration-in-open-state: 60000
+    sliding-window-size: 10
+    minimum-number-of-calls: 5
+  services:
+    clientes:
+      url: http://clientes-service:8081
+      health-check-enabled: true
+    facturacion:
+      url: http://facturacion-service:8082
+      health-check-enabled: true
+    tax-calculator:
+      url: http://tax-calculator-service:8083
+      health-check-enabled: true
+
+# Resilience4j configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      clientesCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 60s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - java.net.ConnectException
+          - java.util.concurrent.TimeoutException
+      facturacionCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 60s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+      taxCalculatorCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 60s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+
+# Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - gateway
+          - circuitbreakers
+          - circuitbreakerevents
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+    gateway:
+      enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      application: ${spring.application.name}
+
+# Distributed Tracing with Zipkin
+management.tracing:
+  sampling:
+    probability: 1.0
+  enabled: true
+
+management.zipkin.tracing:
+  endpoint: http://localhost:9411/api/v2/spans
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.castor.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    io.github.resilience4j: DEBUG
+    org.springframework.web.reactive: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/api-gateway.log
+    max-size: 10MB
+    max-history: 30

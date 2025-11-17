@@ -1,0 +1,14 @@
+# Production configuration
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://postgres:5432/facturacion_db}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres123}
+  jpa:
+    show-sql: false
+
+# Logging
+logging:
+  level:
+    root: WARN
+    com.castor.clientes: INFO

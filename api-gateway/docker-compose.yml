@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: castor-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - CLIENTES_SERVICE_URL=http://clientes-service:8081
+      - FACTURACION_SERVICE_URL=http://facturacion-service:8082
+      - TAX_CALCULATOR_SERVICE_URL=http://tax-calculator-service:8083
+      - ZIPKIN_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - TRACING_ENABLED=true
+      - TRACING_SAMPLING_PROBABILITY=1.0
+      - RATE_LIMITING_ENABLED=true
+      - CIRCUIT_BREAKER_ENABLED=true
+      - LOG_LEVEL_ROOT=INFO
+      - LOG_LEVEL_APP=DEBUG
+    networks:
+      - castor-network
+    depends_on:
+      - zipkin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  # Zipkin for distributed tracing
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: castor-zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - castor-network
+    environment:
+      - JAVA_OPTS=-Xms512m -Xmx512m
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: castor-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - castor-network
+    depends_on:
+      - api-gateway
+
+  # Grafana for metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: castor-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - castor-network
+    depends_on:
+      - prometheus
+
+networks:
+  castor-network:
+    driver: bridge

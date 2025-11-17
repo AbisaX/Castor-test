@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oracle-config
+  namespace: facturacion
+  labels:
+    app: oracle
+    component: config
+data:
+  # Oracle Database Configuration
+  ORACLE_SID: "XE"
+  ORACLE_PDB: "XEPDB1"
+  ORACLE_EDITION: "express"
+
+  # Application User
+  APP_USER: "castor_facturacion"
+  APP_USER_PASSWORD: "castor_pass"
+
+  # Character Set
+  ORACLE_CHARACTERSET: "AL32UTF8"

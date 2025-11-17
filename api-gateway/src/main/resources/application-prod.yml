@@ -1,0 +1,125 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: ${GATEWAY_CONNECT_TIMEOUT:5000}
+        response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:30s}
+        pool:
+          type: elastic
+          max-idle-time: 30s
+          max-connections: 100
+
+# Gateway custom properties
+gateway:
+  rate-limiting:
+    enabled: ${RATE_LIMITING_ENABLED:true}
+    default-limit: ${RATE_LIMIT_DEFAULT:100}
+    default-refresh-period: ${RATE_LIMIT_REFRESH_PERIOD:60}
+  timeouts:
+    connect: ${GATEWAY_CONNECT_TIMEOUT:5000}
+    response: ${GATEWAY_RESPONSE_TIMEOUT:30000}
+  circuit-breaker:
+    enabled: ${CIRCUIT_BREAKER_ENABLED:true}
+    failure-rate-threshold: ${CIRCUIT_BREAKER_FAILURE_RATE:50}
+    wait-duration-in-open-state: ${CIRCUIT_BREAKER_WAIT_DURATION:60000}
+    sliding-window-size: ${CIRCUIT_BREAKER_WINDOW_SIZE:10}
+    minimum-number-of-calls: ${CIRCUIT_BREAKER_MIN_CALLS:5}
+  services:
+    clientes:
+      url: ${CLIENTES_SERVICE_URL:http://clientes-service:8081}
+      health-check-enabled: ${CLIENTES_HEALTH_CHECK:true}
+    facturacion:
+      url: ${FACTURACION_SERVICE_URL:http://facturacion-service:8082}
+      health-check-enabled: ${FACTURACION_HEALTH_CHECK:true}
+    tax-calculator:
+      url: ${TAX_CALCULATOR_SERVICE_URL:http://tax-calculator-service:8083}
+      health-check-enabled: ${TAX_CALCULATOR_HEALTH_CHECK:true}
+
+# Resilience4j configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      clientesCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: ${CIRCUIT_BREAKER_WINDOW_SIZE:10}
+        minimumNumberOfCalls: ${CIRCUIT_BREAKER_MIN_CALLS:5}
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: ${CIRCUIT_BREAKER_WAIT_DURATION:60s}
+        failureRateThreshold: ${CIRCUIT_BREAKER_FAILURE_RATE:50}
+      facturacionCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: ${CIRCUIT_BREAKER_WINDOW_SIZE:10}
+        minimumNumberOfCalls: ${CIRCUIT_BREAKER_MIN_CALLS:5}
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: ${CIRCUIT_BREAKER_WAIT_DURATION:60s}
+        failureRateThreshold: ${CIRCUIT_BREAKER_FAILURE_RATE:50}
+      taxCalculatorCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: ${CIRCUIT_BREAKER_WINDOW_SIZE:10}
+        minimumNumberOfCalls: ${CIRCUIT_BREAKER_MIN_CALLS:5}
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: ${CIRCUIT_BREAKER_WAIT_DURATION:60s}
+        failureRateThreshold: ${CIRCUIT_BREAKER_FAILURE_RATE:50}
+
+# Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+          - prometheus
+          - gateway
+          - circuitbreakers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+    tags:
+      application: ${spring.application.name}
+      environment: production
+
+# Distributed Tracing with Zipkin
+management.tracing:
+  sampling:
+    probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+  enabled: ${TRACING_ENABLED:true}
+
+management.zipkin.tracing:
+  endpoint: ${ZIPKIN_ENDPOINT:http://zipkin:9411/api/v2/spans}
+
+# Logging configuration
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.castor.gateway: ${LOG_LEVEL_APP:INFO}
+    org.springframework.cloud.gateway: ${LOG_LEVEL_GATEWAY:INFO}
+    io.github.resilience4j: ${LOG_LEVEL_RESILIENCE4J:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{traceId}/%X{spanId}] [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_FILE_PATH:/var/log/api-gateway/application.log}
+    max-size: ${LOG_FILE_MAX_SIZE:50MB}
+    max-history: ${LOG_FILE_MAX_HISTORY:30}

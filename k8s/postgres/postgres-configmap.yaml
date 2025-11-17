@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: facturacion
+  labels:
+    app: postgres
+    component: config
+data:
+  POSTGRES_DB: "facturacion_db"
+  POSTGRES_USER: "castor_user"
+
+  # PostgreSQL Configuration for CDC (Debezium)
+  # Habilita replicación lógica para Change Data Capture
+  POSTGRES_INITDB_ARGS: "-c wal_level=logical -c max_wal_senders=10 -c max_replication_slots=10"

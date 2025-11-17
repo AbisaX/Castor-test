@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: facturacion
+data:
+  POSTGRES_HOST: postgres-service
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: clientes_db
+  POSTGRES_USER: postgres
+  ORACLE_HOST: oracle-service
+  ORACLE_PORT: "1521"
+  ORACLE_SID: XE
+  ORACLE_USER: system
+  PYTHON_SERVICE_URL: http://python-calculator-service:5000
+  SPRING_PROFILES_ACTIVE: prod

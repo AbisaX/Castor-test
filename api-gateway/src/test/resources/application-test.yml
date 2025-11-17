@@ -1,0 +1,80 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: api-gateway-test
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 1000
+        response-timeout: 5s
+
+gateway:
+  rate-limiting:
+    enabled: true
+    default-limit: 5
+    default-refresh-period: 60
+  timeouts:
+    connect: 1000
+    response: 5000
+  circuit-breaker:
+    enabled: true
+    failure-rate-threshold: 50
+    wait-duration-in-open-state: 5000
+    sliding-window-size: 5
+    minimum-number-of-calls: 3
+  services:
+    clientes:
+      url: http://localhost:9999
+      health-check-enabled: false
+    facturacion:
+      url: http://localhost:9999
+      health-check-enabled: false
+    tax-calculator:
+      url: http://localhost:9999
+      health-check-enabled: false
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      clientesCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5s
+      facturacionCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5s
+      taxCalculatorCircuitBreaker:
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: false
+
+management.tracing:
+  sampling:
+    probability: 1.0
+
+logging:
+  level:
+    root: INFO
+    com.castor.gateway: DEBUG
